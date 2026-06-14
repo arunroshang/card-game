@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import { CardHand, TrickCard, PlayingCard } from './Card';
 import { BiddingPanel28, BiddingPanel56, TrumpChooser, RaiseBidPanel } from './BiddingPanel';
-import { ChatPanel } from './ChatPanel';
-import { ScorePanel } from './ScorePanel';
-import { HandResultModal } from './HandResultModal';
+import { ChatPanel, ScorePanel, HandResultModal } from './ChatPanel';
 
 const SUIT_SYMBOLS = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠' };
 const POSITION_LABELS = ['South', 'West', 'North', 'East']; // relative to viewer
