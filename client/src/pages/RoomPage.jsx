@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 import { useGameState } from '../hooks/useGameState';
+import { GameTable } from '../components/GameTable';
 
 const SEAT_LABELS = ['Seat 1', 'Seat 2', 'Seat 3', 'Seat 4', 'Seat 5', 'Seat 6', 'Seat 7', 'Seat 8'];
 
@@ -296,7 +297,6 @@ export function RoomPage() {
 
   // If game is in progress, show game table
   if (gameState && gameState.phase !== 'done') {
-    const { GameTable } = require('./GameTable'); // lazy-ish
     return <GameTable
       gameState={gameState}
       myInfo={myInfo}
