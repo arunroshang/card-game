@@ -84,30 +84,33 @@ export function CardHand({ cards, selectedCard, onCardSelect, onCardPlay, playab
     <div className="flex items-center justify-center h-24 text-cardWhite/40 text-sm">No cards</div>
   );
 
-  // Overlap cards in a fan
-  const totalWidth = Math.min(cards.length * 36 + 56, window.innerWidth - 32);
-  const overlap = cards.length > 1 ? Math.min(36, (totalWidth - 56) / (cards.length - 1)) : 0;
+  // Overlap cards in a fan using negative margins (normal flow — never collapses).
+  // Card at size "lg" is 64px wide (w-16). Overlap so a sliver of each card shows.
+  const CARD_W = 64;
+  const step = cards.length > 8 ? 32 : 44; // px of each card visible before the next overlaps it
+  const marginLeft = step - CARD_W;        // negative → cards overlap
 
   return (
-    <div className="relative flex items-end safe-bottom" style={{ height: '96px' }}>
-      <div className="relative w-full overflow-x-auto overflow-y-visible pb-1 px-4">
-        <div className="relative flex items-end" style={{ width: `${(cards.length - 1) * overlap + 56}px`, minWidth: '100%' }}>
-          {cards.map((card, idx) => (
-            <div
-              key={`${card.suit}-${card.rank}-${card.copy ?? idx}`}
-              className="absolute bottom-0 transition-all duration-150"
-              style={{ left: `${idx * overlap}px`, zIndex: isSelected(card) ? 100 : idx }}
-            >
-              <PlayingCard
-                card={card}
-                selected={isSelected(card)}
-                playable={isMyTurn ? isPlayable(card) : undefined}
-                onClick={() => handleCardTap(card, idx)}
-                size="lg"
-              />
-            </div>
-          ))}
-        </div>
+    <div className="w-full overflow-x-auto px-4 pt-6 pb-2 safe-bottom">
+      <div
+        className="flex items-end mx-auto"
+        style={{ width: 'max-content', minWidth: 'min-content', minHeight: '104px' }}
+      >
+        {cards.map((card, idx) => (
+          <div
+            key={`${card.suit}-${card.rank}-${card.copy ?? idx}`}
+            className="flex-shrink-0 transition-all duration-150"
+            style={{ marginLeft: idx === 0 ? 0 : `${marginLeft}px`, zIndex: isSelected(card) ? 100 : idx }}
+          >
+            <PlayingCard
+              card={card}
+              selected={isSelected(card)}
+              playable={isMyTurn ? isPlayable(card) : undefined}
+              onClick={() => handleCardTap(card, idx)}
+              size="lg"
+            />
+          </div>
+        ))}
       </div>
     </div>
   );
