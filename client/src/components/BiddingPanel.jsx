@@ -11,15 +11,11 @@ export function BiddingPanel28({ gameState, mySeat, onBid, onPass }) {
 
   const minBid = Math.max(14, (gameState.highBid || 13) + 1);
   const isMyTurn = gameState.currentBidder === mySeat;
-  const alreadyBid = gameState.bids[mySeat] !== undefined;
-
-  if (!isMyTurn || alreadyBid) {
+  if (!isMyTurn) {
     return (
       <div className="panel p-4 text-center">
         <p className="text-cardWhite/60 text-sm">
-          {alreadyBid
-            ? `You bid ${gameState.bids[mySeat] === 'pass' ? 'Pass' : gameState.bids[mySeat]}`
-            : `Waiting for seat ${(gameState.currentBidder ?? 0) + 1} to bid…`}
+          {`Waiting for seat ${(gameState.currentBidder ?? 0) + 1} to bid…`}
         </p>
         {gameState.highBid > 13 && (
           <p className="text-gold text-sm mt-1">Current high bid: <strong>{gameState.highBid}</strong></p>
@@ -186,17 +182,14 @@ export function BiddingPanel56({ gameState, mySeat, onBid, onPass, onDouble, onR
 
   const minPoints = Math.max(28, (gameState.highBid?.points ?? 27) + 1);
   const isMyTurn = gameState.currentBidder === mySeat;
-  const alreadyBid = gameState.bids[mySeat] !== undefined;
   const canDouble = gameState.highBid?.points >= 28 && !gameState.doubled && gameState.highBidder !== null;
   const canRedouble = gameState.doubled && !gameState.redoubled;
 
-  if (!isMyTurn || alreadyBid) {
+  if (!isMyTurn) {
     return (
       <div className="panel p-4 text-center">
         <p className="text-cardWhite/60 text-sm">
-          {alreadyBid
-            ? `You bid ${typeof gameState.bids[mySeat] === 'string' ? gameState.bids[mySeat] : `${gameState.bids[mySeat]?.points} ${gameState.bids[mySeat]?.suit}`}`
-            : `Waiting for seat ${(gameState.currentBidder ?? 0) + 1}…`}
+          {`Waiting for seat ${(gameState.currentBidder ?? 0) + 1}…`}
         </p>
         {gameState.highBid?.points && (
           <p className="text-gold text-sm mt-1">
