@@ -196,6 +196,7 @@ function chooseTrump(state, seat, card) {
   state.round1Bidder = state.highBidder;
   state.round2 = true;
   state.round2Acted = [];                    // seats that have acted at least once
+  state.round2BidMade = false;               // becomes true only on a real ≥20 raise
   state.passCount = 0;
   state.currentBidder = state.highBidder;     // round-1 winner acts first
   state.phase = 'bidding2';
@@ -216,6 +217,7 @@ function placeBid2(state, seat, bid) {
   state.bids[seat] = bid;
   state.highBid = bid;
   state.highBidder = seat;
+  state.round2BidMade = true; // an actual raise (≥20) happened this round
   state.passCount = 0;
   if (!state.round2Acted.includes(seat)) state.round2Acted.push(seat);
   state.currentBidder = nextCounterClockwise(seat);
@@ -240,7 +242,11 @@ function passBid2(state, seat) {
 }
 
 function finalizeBidding2(state) {
-  // The final high bidder holds the contract and chooses (or changes) trump.
+  // Only offer the trump set/change step if a real round-2 bid (≥20) was made.
+  // If everyone passed, the round-1 contract and trump stand — go straight to play.
+  if (!state.round2BidMade) {
+    return startPlay(state);
+  }
   state.phase = 'choosing_trump2';
   return { ok: true, awaitingTrump2: true, bidder: state.highBidder };
 }
@@ -574,6 +580,7 @@ function nextHand(state) {
   state.lastHandResult = null;
   state.round2 = false;
   state.round2Acted = [];
+  state.round2BidMade = false;
   state.round1Bid = null;
   state.round1Bidder = null;
   state.phase = 'bidding';

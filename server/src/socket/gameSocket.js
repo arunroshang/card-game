@@ -205,6 +205,9 @@ module.exports = function setupSocket(io) {
           trumpSuit: state.trumpSuit || '?',
         });
       }
+      // Nudge bots: next bidder, round-1 winner choosing trump, round-2 bidder,
+      // or the first leader if round 2 ended straight into play.
+      scheduleNextBotMove(io, roomId, state, players);
     });
 
     // ── Choose Trump (28 only) ────────────────────────────────
