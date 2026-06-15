@@ -58,40 +58,52 @@ export function GameTable({ gameState, myInfo, players, chatMessages, actions, n
       </div>
 
       {/* ── Top bar ── */}
-      <div className="flex items-center justify-between px-3 py-2 bg-feltDark/60 backdrop-blur-sm z-10">
+      <div className="flex items-center justify-between px-3 py-2.5 bg-feltDark/60 backdrop-blur-sm z-10">
         <div className="flex items-center gap-2">
-          <span className="font-display text-gold font-bold text-lg">{gameType}</span>
-          <span className="text-cardWhite/40 text-xs">Hand #{gameState?.handNumber}</span>
+          <span className="font-display text-gold font-bold text-2xl">{gameType}</span>
+          <span className="text-cardWhite/50 text-sm">Hand #{gameState?.handNumber}</span>
         </div>
 
         {/* Score display */}
         <div className="flex items-center gap-3">
-          <div className="flex gap-2">
-            <span className="text-red-300 text-sm font-medium">{gameState?.score?.[0] ?? 0}</span>
-            <span className="text-white/40 text-sm">·</span>
-            <span className="text-blue-300 text-sm font-medium">{gameState?.score?.[1] ?? 0}</span>
+          <div className="flex items-center gap-2 bg-uiBg/40 rounded-lg px-3 py-1">
+            <span className="text-red-300 text-lg font-bold">{gameState?.score?.[0] ?? 0}</span>
+            <span className="text-white/40">–</span>
+            <span className="text-blue-300 text-lg font-bold">{gameState?.score?.[1] ?? 0}</span>
           </div>
-          <button onClick={() => setShowScore(true)} className="text-gold/60 text-xs px-2 py-1 rounded border border-gold/20 active:bg-gold/10">
+          <button onClick={() => setShowScore(true)} className="text-gold/80 text-sm px-2.5 py-1.5 rounded border border-gold/30 active:bg-gold/10">
             Scores
           </button>
-          <button onClick={() => setShowChat(true)} className="text-gold/60 text-xs px-2 py-1 rounded border border-gold/20 active:bg-gold/10 relative">
+          <button onClick={() => setShowChat(true)} className="text-gold/80 text-sm px-2.5 py-1.5 rounded border border-gold/30 active:bg-gold/10 relative">
             Chat
           </button>
         </div>
       </div>
 
+      {/* ── Live card-points tally for this hand ── */}
+      {gameState?.phase === 'playing' && (
+        <div className="flex items-center justify-center gap-4 py-1.5 bg-feltDark/30 text-sm">
+          <span className="text-cardWhite/50">This hand:</span>
+          <span className="text-red-300 font-semibold">Team 1 · {gameState?.pointsWon?.[0] ?? 0} pts</span>
+          <span className="text-blue-300 font-semibold">Team 2 · {gameState?.pointsWon?.[1] ?? 0} pts</span>
+          {gameState?.highBid && (
+            <span className="text-gold/80">Bid {gameState.highBid?.points || gameState.highBid}</span>
+          )}
+        </div>
+      )}
+
       {/* ── Trump indicator ── */}
       {gameState?.trumpSuit && (
-        <div className="absolute top-12 left-3 z-20">
-          <div className="bg-gold/20 border border-gold/40 rounded-lg px-2 py-1 text-xs text-gold">
-            Trump: {SUIT_SYMBOLS[gameState.trumpSuit]}
+        <div className="absolute top-14 left-3 z-20">
+          <div className="bg-gold/20 border border-gold/40 rounded-lg px-3 py-1.5 text-base text-gold font-semibold">
+            Trump: <span className="text-xl">{SUIT_SYMBOLS[gameState.trumpSuit]}</span>
           </div>
         </div>
       )}
       {gameState?.trumpSuitForBidder && !gameState?.trumpSuit && (
-        <div className="absolute top-12 left-3 z-20">
-          <div className="bg-uiPanel/80 border border-gold/30 rounded-lg px-2 py-1 text-xs text-gold/80">
-            Your trump: {SUIT_SYMBOLS[gameState.trumpSuitForBidder]} (hidden)
+        <div className="absolute top-14 left-3 z-20">
+          <div className="bg-uiPanel/80 border border-gold/30 rounded-lg px-3 py-1.5 text-sm text-gold/90 font-medium">
+            Your trump: <span className="text-lg">{SUIT_SYMBOLS[gameState.trumpSuitForBidder]}</span> (hidden)
           </div>
         </div>
       )}
@@ -170,9 +182,9 @@ export function GameTable({ gameState, myInfo, players, chatMessages, actions, n
             <div className="absolute inset-0 flex items-center justify-center">
               {gameState?.trickCount && (
                 <div className="text-center">
-                  <div className="text-red-300 text-xs">{gameState.trickCount[0]}</div>
-                  <div className="text-white/30 text-xs">tricks</div>
-                  <div className="text-blue-300 text-xs">{gameState.trickCount[1]}</div>
+                  <div className="text-red-300 text-base font-bold">{gameState.trickCount[0]}</div>
+                  <div className="text-white/40 text-xs">tricks</div>
+                  <div className="text-blue-300 text-base font-bold">{gameState.trickCount[1]}</div>
                 </div>
               )}
             </div>
@@ -194,8 +206,8 @@ export function GameTable({ gameState, myInfo, players, chatMessages, actions, n
       {/* ── My hand ── */}
       <div className="pb-1">
         <div className="flex items-center justify-between px-4 mb-1">
-          <span className="text-cardWhite/60 text-xs">{myInfo?.name}</span>
-          <span className={`text-xs font-medium ${isMyTurn ? 'text-gold animate-pulse' : 'text-white/30'}`}>
+          <span className="text-cardWhite/70 text-base font-medium">{myInfo?.name}</span>
+          <span className={`text-base font-semibold ${isMyTurn ? 'text-gold animate-pulse' : 'text-white/40'}`}>
             {isMyTurn ? '▶ Your turn' : 'Your hand'}
           </span>
         </div>
@@ -268,21 +280,21 @@ function PlayerInfo({ seat, player, position, handSize, isActive, bid, trickCard
 
   return (
     <div className={positions[position]}>
-      <div className={`rounded-xl px-2 py-1 text-xs font-medium border
+      <div className={`rounded-xl px-3 py-1.5 text-sm font-medium border
         ${isActive ? 'animate-pulse-glow border-gold bg-gold/10 text-gold' :
           team === 0 ? 'border-teamRed/30 bg-teamRed/10 text-red-300' :
           'border-teamBlue/30 bg-teamBlue/10 text-blue-300'}
         ${!player?.connected ? 'opacity-50' : ''}`}>
         <div className="flex items-center gap-1">
           {!player?.connected && <span>🤖</span>}
-          <span className="truncate max-w-[72px]">{player?.name || `P${seat + 1}`}</span>
+          <span className="truncate max-w-[96px] font-semibold">{player?.name || `P${seat + 1}`}</span>
         </div>
-        <div className="text-white/40 text-center">{handSize} cards</div>
+        <div className="text-white/50 text-center text-xs">{handSize} cards</div>
         {bid !== undefined && (
           <div className="text-center mt-0.5">
-            {bid === 'pass' ? <span className="text-white/40">Pass</span> :
-              typeof bid === 'object' ? <span className="text-gold">{bid.points}</span> :
-              <span className="text-gold">{bid}</span>}
+            {bid === 'pass' ? <span className="text-white/40 text-sm">Pass</span> :
+              typeof bid === 'object' ? <span className="text-gold text-base font-bold">{bid.points}</span> :
+              <span className="text-gold text-base font-bold">{bid}</span>}
           </div>
         )}
       </div>

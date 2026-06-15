@@ -138,38 +138,57 @@ export function ScorePanel({ gameState, players, onClose }) {
 export function HandResultModal({ result, score, onNext }) {
   if (!result) return null;
 
-  const { success, bid, bidderTeam, bidderPoints, gamePoints, isThani, isCot, winTables, loseTables } = result;
+  const { success, bid, bidderTeam, bidderPoints, teamPoints, gamePoints, isThani, isCot, winTables, loseTables } = result;
   const pointsDisplay = winTables || loseTables ? (success ? `+${winTables}` : `-${loseTables}`) : (success ? `+${gamePoints}` : `-${gamePoints}`);
+  const t0 = teamPoints?.[0] ?? (bidderTeam === 0 ? bidderPoints : 28 - bidderPoints);
+  const t1 = teamPoints?.[1] ?? (bidderTeam === 1 ? bidderPoints : 28 - bidderPoints);
 
   return (
     <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-6">
       <div className="panel p-6 max-w-sm w-full space-y-4">
         {/* Result header */}
         <div className="text-center">
-          {isThani && <div className="text-purple-400 text-sm font-medium mb-1">THANI</div>}
-          {isCot && <div className="text-gold text-sm font-medium mb-1">COT — ALL TRICKS!</div>}
-          <div className={`font-display text-3xl ${success ? 'text-green-400' : 'text-red-400'}`}>
-            {success ? '✓ Made it' : '✗ Set'}
+          {isThani && <div className="text-purple-400 text-base font-semibold mb-1">THANI</div>}
+          {isCot && <div className="text-gold text-base font-semibold mb-1">COT — ALL TRICKS!</div>}
+          <div className={`font-display text-4xl ${success ? 'text-green-400' : 'text-red-400'}`}>
+            {success ? '✓ Contract made' : '✗ Contract set'}
           </div>
-          <div className="text-cardWhite/60 text-sm mt-1">
-            Bid {bid} · Got {bidderPoints} points
+          <div className="text-cardWhite/70 text-base mt-2">
+            Bidding team (Team {bidderTeam + 1}) bid <strong className="text-gold">{bid}</strong>, captured <strong className="text-cardWhite">{bidderPoints}</strong>
           </div>
         </div>
 
-        {/* Points delta */}
-        <div className={`text-center font-display text-5xl ${success ? 'text-green-400' : 'text-red-400'}`}>
-          {pointsDisplay}
+        {/* Card points captured this hand — both teams */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-uiBg/50 rounded-lg p-3 text-center">
+            <div className="text-red-300 text-sm">Team 1 captured</div>
+            <div className="font-display text-3xl text-red-300">{t0}</div>
+            <div className="text-white/30 text-xs">card points</div>
+          </div>
+          <div className="bg-uiBg/50 rounded-lg p-3 text-center">
+            <div className="text-blue-300 text-sm">Team 2 captured</div>
+            <div className="font-display text-3xl text-blue-300">{t1}</div>
+            <div className="text-white/30 text-xs">card points</div>
+          </div>
         </div>
 
-        {/* Updated scores */}
+        {/* Game-point delta */}
+        <div className="text-center">
+          <div className="text-cardWhite/50 text-sm">Game points this hand</div>
+          <div className={`font-display text-5xl ${success ? 'text-green-400' : 'text-red-400'}`}>
+            {pointsDisplay}
+          </div>
+        </div>
+
+        {/* Cumulative match score */}
         <div className="grid grid-cols-2 gap-3">
           <div className={`panel p-3 text-center ${bidderTeam === 0 && success ? 'ring-1 ring-green-500/50' : ''}`}>
-            <div className="text-red-300 text-xs">Team 1</div>
-            <div className="font-display text-2xl text-red-300">{score[0]}</div>
+            <div className="text-red-300 text-sm">Team 1 total</div>
+            <div className="font-display text-3xl text-red-300">{score[0]}</div>
           </div>
           <div className={`panel p-3 text-center ${bidderTeam === 1 && success ? 'ring-1 ring-green-500/50' : ''}`}>
-            <div className="text-blue-300 text-xs">Team 2</div>
-            <div className="font-display text-2xl text-blue-300">{score[1]}</div>
+            <div className="text-blue-300 text-sm">Team 2 total</div>
+            <div className="font-display text-3xl text-blue-300">{score[1]}</div>
           </div>
         </div>
 

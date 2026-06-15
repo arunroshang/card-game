@@ -379,12 +379,19 @@ function requestTrumpReveal(state, seat) {
 
   revealTrump(state);
   state.trumpRevealedOnTrick = state.tricks.length;
+  // Cards already on the table this trick when trump is revealed do NOT
+  // retroactively become trumps — record how many were already played.
+  state.trumpRevealCardIndex = state.currentTrick.length;
   return { ok: true, trumpSuit: state.trumpSuit };
 }
 
 function revealTrump(state) {
   state.trumpRevealed = true;
   state.trumpSuit = state.trumpCard.suit;
+  if (state.trumpRevealedOnTrick === null || state.trumpRevealedOnTrick === undefined) {
+    state.trumpRevealedOnTrick = state.tricks.length;
+    state.trumpRevealCardIndex = state.currentTrick.length;
+  }
 }
 
 function resolveTrick(state) {
@@ -398,10 +405,17 @@ function resolveTrick(state) {
 
   for (let i = 0; i < trick.length; i++) {
     const { card } = trick[i];
-    // Cards of trump suit played BEFORE reveal don't count as trump
-    const cardIsEffectiveTrump = state.trumpRevealed && card.suit === state.trumpSuit &&
-      (state.trumpRevealedOnTrick === null || state.tricks.length >= state.trumpRevealedOnTrick ||
-        i >= trick.findIndex(t => t === trick[i])); // simplified: after reveal moment in trick
+    // A trump-suit card counts as a trump only if it was played at or after the
+    // moment trump was revealed. In the reveal trick, that means index >= the
+    // number of cards already on the table when the reveal happened. In any later
+    // trick, all trump-suit cards count.
+    const isRevealTrick = state.trumpRevealedOnTrick !== null
+      && state.trumpRevealedOnTrick !== undefined
+      && state.tricks.length === state.trumpRevealedOnTrick;
+    const playedAfterReveal = !isRevealTrick || i >= (state.trumpRevealCardIndex ?? 0);
+    const cardIsEffectiveTrump = state.trumpRevealed
+      && card.suit === state.trumpSuit
+      && playedAfterReveal;
     const w = cardIsEffectiveTrump
       ? 1000 + (RANK_ORDER.length - RANK_ORDER.indexOf(card.rank))
       : card.suit === suitLed
@@ -511,6 +525,8 @@ function scoreHand(state) {
     bid,
     bidderTeam,
     bidderPoints,
+    defenderPoints: state.pointsWon[defenderTeam],
+    teamPoints: { 0: state.pointsWon[0], 1: state.pointsWon[1] },
     gamePoints: Math.abs(gamePoints),
     isThani: state.isThani,
     isCot: state.isCot,
@@ -544,6 +560,7 @@ function nextHand(state) {
   state.trumpSuit = null;
   state.trumpRevealed = false;
   state.trumpRevealedOnTrick = null;
+  state.trumpRevealCardIndex = 0;
   state.trumpIndicatorSeat = null;
   state.currentTrick = [];
   state.tricks = [];
