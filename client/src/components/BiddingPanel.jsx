@@ -6,19 +6,33 @@ const SUIT_COLORS = { hearts: 'text-red-400', diamonds: 'text-red-400', clubs: '
 
 // ── 28 Bidding Panel ──────────────────────────────────────────
 
-export function BiddingPanel28({ gameState, mySeat, onBid, onPass }) {
-  const [bidValue, setBidValue] = useState(Math.max(14, (gameState.highBid || 13) + 1));
-
-  const minBid = Math.max(14, (gameState.highBid || 13) + 1);
+export function BiddingPanel28({ gameState, mySeat, onBid, onPass, round2 = false }) {
+  // In round 2 the floor is the server-provided minimum (≥20); otherwise ≥14.
+  const minBid = round2
+    ? (gameState.round2MinBid || Math.max(20, (gameState.highBid || 19) + 1))
+    : Math.max(14, (gameState.highBid || 13) + 1);
+  const [bidValue, setBidValue] = useState(minBid);
   const isMyTurn = gameState.currentBidder === mySeat;
+
+  // Keep the stepper's value at or above the current minimum as bids come in.
+  if (bidValue < minBid) setBidValue(minBid);
+
+  // The server is the single source of truth for whose turn it is (it uses the
+  // "three consecutive passes" rule and may legitimately return to a player who
+  // bid or passed earlier). So show the bid controls whenever it's our turn —
+  // never gate on whether we've acted before, or the auction can deadlock.
   if (!isMyTurn) {
     return (
       <div className="panel p-4 text-center">
         <p className="text-cardWhite/60 text-sm">
-          {`Waiting for seat ${(gameState.currentBidder ?? 0) + 1} to bid…`}
+          Waiting for seat {(gameState.currentBidder ?? 0) + 1} to {round2 ? 'raise or pass' : 'bid'}…
         </p>
         {gameState.highBid > 13 && (
-          <p className="text-gold text-sm mt-1">Current high bid: <strong>{gameState.highBid}</strong></p>
+          <p className="text-gold text-sm mt-1">
+            {round2 ? 'Round 2 — ' : ''}High bid: <strong>{gameState.highBid}</strong>
+            {gameState.highBidder !== null && gameState.highBidder !== undefined
+              ? ` (seat ${gameState.highBidder + 1})` : ''}
+          </p>
         )}
       </div>
     );
@@ -27,10 +41,10 @@ export function BiddingPanel28({ gameState, mySeat, onBid, onPass }) {
   return (
     <div className="panel p-4 space-y-3">
       <div className="text-center">
-        <p className="text-gold font-display text-lg">Your bid</p>
-        {gameState.highBid > 13 && (
-          <p className="text-cardWhite/60 text-xs">High bid: {gameState.highBid}</p>
-        )}
+        <p className="text-gold font-display text-lg">{round2 ? 'Round 2 — raise or pass' : 'Your bid'}</p>
+        {round2
+          ? <p className="text-cardWhite/60 text-xs">Minimum {minBid} · or pass to let it go around</p>
+          : (gameState.highBid > 13 && <p className="text-cardWhite/60 text-xs">High bid: {gameState.highBid}</p>)}
       </div>
 
       {/* Bid stepper */}
@@ -60,8 +74,7 @@ export function BiddingPanel28({ gameState, mySeat, onBid, onPass }) {
       <div className="flex gap-2">
         <button className="btn-secondary flex-1" onClick={onPass}>Pass</button>
         <button className="btn-primary flex-1" onClick={() => onBid(bidValue)}>
-          Bid {bidValue}
-        </button>
+          {round2 ? 'Raise to' : 'Bid'} {bidValue}</button>
       </div>
     </div>
   );
@@ -69,7 +82,7 @@ export function BiddingPanel28({ gameState, mySeat, onBid, onPass }) {
 
 // ── Trump Chooser (28) ────────────────────────────────────────
 
-export function TrumpChooser({ hand, onChoose }) {
+export function TrumpChooser({ hand, onChoose, round2 = false, currentTrump = null, onThani = null }) {
   const [selectedSuit, setSelectedSuit] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
 
@@ -82,8 +95,14 @@ export function TrumpChooser({ hand, onChoose }) {
 
   return (
     <div className="panel p-4 space-y-3">
-      <p className="text-gold font-display text-center text-lg">Choose trump suit</p>
-      <p className="text-cardWhite/60 text-xs text-center">Tap a suit, then select which card to place face-down</p>
+      <p className="text-gold font-display text-center text-lg">
+        {round2 ? 'Set or change trump' : 'Choose trump suit'}
+      </p>
+      <p className="text-cardWhite/60 text-xs text-center">
+        {round2 && currentTrump
+          ? `Current trump is ${SUIT_SYMBOLS[currentTrump]} — pick a card to keep or change it`
+          : 'Tap a suit, then select which card to place face-down'}
+      </p>
 
       <div className="grid grid-cols-4 gap-2">
         {SUITS.map(suit => (
@@ -128,8 +147,22 @@ export function TrumpChooser({ hand, onChoose }) {
           }
         }}
       >
-        Confirm Trump
+        {round2 ? 'Confirm & start play' : 'Confirm Trump'}
       </button>
+
+      {round2 && onThani && (
+        <button
+          className="btn-danger w-full"
+          disabled={!selectedSuit || selectedCard === null}
+          onClick={() => {
+            if (selectedSuit && selectedCard !== null) {
+              onChoose(bySuit[selectedSuit][selectedCard], true);
+            }
+          }}
+        >
+          🎯 Declare Thani (solo)
+        </button>
+      )}
     </div>
   );
 }
@@ -189,7 +222,7 @@ export function BiddingPanel56({ gameState, mySeat, onBid, onPass, onDouble, onR
     return (
       <div className="panel p-4 text-center">
         <p className="text-cardWhite/60 text-sm">
-          {`Waiting for seat ${(gameState.currentBidder ?? 0) + 1}…`}
+          Waiting for seat {(gameState.currentBidder ?? 0) + 1}…
         </p>
         {gameState.highBid?.points && (
           <p className="text-gold text-sm mt-1">

@@ -5,7 +5,7 @@
 
 const {
   createGame28, placeBid, passBid, chooseTrump,
-  raiseBid, skipRaise, declareThani,
+  placeBid2, passBid2, chooseTrump2, declareThani,
   requestTrumpReveal, playCard, offerSurrender,
   respondSurrender, nextHand, getPlayerView, checkRedeal,
 } = require('../engine/game28');
@@ -174,7 +174,11 @@ module.exports = function setupSocket(io) {
 
       let result;
       if (state.gameType === '28') {
-        result = bid === 'pass' ? passBid(state, seat) : placeBid(state, seat, bid);
+        if (state.phase === 'bidding2') {
+          result = bid === 'pass' ? passBid2(state, seat) : placeBid2(state, seat, bid);
+        } else {
+          result = bid === 'pass' ? passBid(state, seat) : placeBid(state, seat, bid);
+        }
       } else {
         if (bid === 'pass') result = passBid56(state, seat);
         else if (bid === 'double') result = doubleBid56(state, seat);
@@ -191,6 +195,9 @@ module.exports = function setupSocket(io) {
       if (result.awaitingTrump) {
         io.to(roomId).emit('awaiting_trump', { bidder: state.highBidder });
       }
+      if (result.awaitingTrump2) {
+        io.to(roomId).emit('awaiting_trump2', { bidder: state.highBidder });
+      }
       if (result.biddingDone) {
         io.to(roomId).emit('bidding_complete', {
           highBid: state.highBid,
@@ -202,39 +209,31 @@ module.exports = function setupSocket(io) {
 
     // ── Choose Trump (28 only) ────────────────────────────────
 
-    socket.on('choose_trump', async ({ card }) => {
+    socket.on('choose_trump', async ({ card, thani }) => {
       const { roomId, seat } = socket.data || {};
       if (!roomId || !gameStates[roomId]) return;
       const state = gameStates[roomId];
+
+      // Round 2 trump choice (winner may keep or change trump, optionally Thani)
+      if (state.phase === 'choosing_trump2') {
+        const r2 = chooseTrump2(state, seat, card, !!thani);
+        if (r2.error) return socket.emit('error', { message: r2.error });
+        const players = await roomManager.getPlayers(roomId);
+        if (r2.thani) io.to(roomId).emit('thani_declared', { seat });
+        broadcastGameState(io, roomId, state, '28', players);
+        io.to(roomId).emit('trump_chosen', { bidder: seat });
+        scheduleNextBotMove(io, roomId, state, players);
+        return;
+      }
 
       const result = chooseTrump(state, seat, card);
       if (result.error) return socket.emit('error', { message: result.error });
 
-      // Check redeal conditions
-      const redeal = checkRedeal(state);
-      if (redeal.redeal) {
-        io.to(roomId).emit('redeal', { reason: redeal.reason });
-        const players = await roomManager.getPlayers(roomId);
-        const seats = players.map(p => ({ seat: p.seat, name: p.name, team: p.team }));
-        gameStates[roomId] = createGame28(seats);
-        const newState = gameStates[roomId];
-        broadcastGameState(io, roomId, newState, '28', players);
-        return;
-      }
-
       const players = await roomManager.getPlayers(roomId);
       broadcastGameState(io, roomId, state, '28', players);
       io.to(roomId).emit('trump_chosen', { bidder: seat });
-    });
-
-    socket.on('raise_bid', async ({ newBid }) => {
-      const { roomId, seat } = socket.data || {};
-      if (!roomId || !gameStates[roomId]) return;
-      const state = gameStates[roomId];
-      const result = newBid ? raiseBid(state, seat, newBid) : skipRaise(state);
-      if (result?.error) return socket.emit('error', { message: result.error });
-      const players = await roomManager.getPlayers(roomId);
-      broadcastGameState(io, roomId, state, '28', players);
+      // Round 2 auction now open — nudge bots if the first round-2 bidder is one
+      scheduleNextBotMove(io, roomId, state, players);
     });
 
     socket.on('declare_thani', async () => {
@@ -416,8 +415,8 @@ module.exports = function setupSocket(io) {
   }
 
   function scheduleNextBotMove(io, roomId, state, players, forceSeat) {
-    if (state.phase !== 'playing' && state.phase !== 'bidding' &&
-        state.phase !== 'choosing_trump' && state.phase !== 'bidding2') return;
+    const botPhases = ['playing', 'bidding', 'choosing_trump', 'bidding2', 'choosing_trump2'];
+    if (!botPhases.includes(state.phase)) return;
 
     const activeSeat = forceSeat ?? getActiveSeat(state);
     if (activeSeat === undefined || activeSeat === null) return;
@@ -453,11 +452,22 @@ module.exports = function setupSocket(io) {
 
       if (state.phase === 'choosing_trump') {
         const trumpCard = botChooseTrump28(state.hands[seat]);
-        chooseTrump(state, seat, trumpCard);
-        skipRaise(state);
+        chooseTrump(state, seat, trumpCard); // opens round 2
       }
+    } else if (state.phase === 'choosing_trump') {
+      // Bot is the round-1 winner choosing trump
+      const trumpCard = botChooseTrump28(state.hands[seat]);
+      chooseTrump(state, seat, trumpCard);
     } else if (state.phase === 'bidding2') {
-      skipRaise(state);
+      // Round 2: bot raises only if it has a strong hand above the min, else passes
+      const min = require('../engine/game28').round2MinBid(state);
+      const handPts = state.hands[seat].reduce((s, c) => s + (c.points || 0), 0);
+      if (handPts >= 14 && min <= 28) placeBid2(state, seat, min);
+      else passBid2(state, seat);
+    } else if (state.phase === 'choosing_trump2') {
+      // Bot won round 2 — pick a trump card and start play
+      const trumpCard = botChooseTrump28(state.hands[seat]);
+      chooseTrump2(state, seat, trumpCard);
     } else if (state.phase === 'playing') {
       const card = botPlayCard28(state, seat);
       if (card) {
@@ -500,7 +510,8 @@ module.exports = function setupSocket(io) {
   function getActiveSeat(state) {
     if (state.phase === 'bidding') return state.currentBidder;
     if (state.phase === 'choosing_trump') return state.highBidder;
-    if (state.phase === 'bidding2') return state.highBidder;
+    if (state.phase === 'bidding2') return state.currentBidder;
+    if (state.phase === 'choosing_trump2') return state.highBidder;
     if (state.phase === 'playing') {
       if (state.gameType === '28') {
         const { getCurrentPlayer28 } = require('../engine/game28');

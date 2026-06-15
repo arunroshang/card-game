@@ -112,7 +112,7 @@ export function useGameState(socket) {
     },
     startGame: (roomId) => socket?.emit('start_game', { roomId }),
     placeBid: (bid) => socket?.emit('place_bid', { bid }),
-    chooseTrump: (card) => socket?.emit('choose_trump', { card }),
+    chooseTrump: (card, thani = false) => socket?.emit('choose_trump', { card, thani }),
     raiseBid: (newBid) => socket?.emit('raise_bid', { newBid }),
     skipRaise: () => socket?.emit('raise_bid', { newBid: null }),
     declareThani: () => socket?.emit('declare_thani'),

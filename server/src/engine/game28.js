@@ -162,13 +162,15 @@ function passBid(state, seat) {
 function finalizeBidding(state) {
   state.biddingComplete = true;
   state.trumpIndicatorSeat = state.highBidder;
-  // High bidder must now choose trump — client sends chooseTrump()
+  // Round-1 winner must now choose trump — client sends chooseTrump()
   state.phase = 'choosing_trump';
   return { ok: true, awaitingTrump: true, bidder: state.highBidder };
 }
 
+// ── Round 1 trump choice → deal 2nd 4 cards → open ROUND 2 auction ──
+
 function chooseTrump(state, seat, card) {
-  // Bidder places a card of their chosen trump suit face-down
+  // Round-1 winner places a card of their chosen trump suit face-down
   if (state.phase !== 'choosing_trump') return { error: 'Not choosing trump phase' };
   if (seat !== state.highBidder) return { error: 'Only the bidder chooses trump' };
 
@@ -176,51 +178,110 @@ function chooseTrump(state, seat, card) {
   if (handIdx === -1) return { error: 'Card not in hand' };
 
   state.trumpCard = state.hands[seat].splice(handIdx, 1)[0];
-  // Don't reveal suit to other players yet — trumpSuit stays null
+  state.trumpIndicatorSeat = seat;
+  // Trump suit stays hidden (trumpSuit null) until revealed in play
 
-  // Deal remaining 4 cards each
+  // Deal the remaining 4 cards to everyone (now 8 each)
   const dealOrder = getCounterClockwiseOrder(state.dealer, 4);
   for (let i = 0; i < 4; i++) {
-    for (const seat of dealOrder) {
-      if (state._deck.length > 0) {
-        state.hands[seat].push(state._deck.pop());
-      }
+    for (const s of dealOrder) {
+      if (state._deck.length > 0) state.hands[s].push(state._deck.pop());
     }
   }
-  // Return trump card to bidder's hand (now has 7, total will be 8 after)
-  // Actually bidder now has 3 (dealt 4 - 1 trump) + 4 more = 7. Add trump back.
+  // Return the face-down trump card to the chooser's hand (back to 8)
   state.hands[seat].push(state.trumpCard);
 
-  state.phase = 'bidding2'; // optional raise phase
+  // Open ROUND 2: full auction, starts with the round-1 winner, minimum bid 20.
+  state.round1Bid = state.highBid;          // remember round-1 contract as the floor
+  state.round1Bidder = state.highBidder;
+  state.round2 = true;
+  state.round2Acted = [];                    // seats that have acted at least once
+  state.passCount = 0;
+  state.currentBidder = state.highBidder;     // round-1 winner acts first
+  state.phase = 'bidding2';
+  return { ok: true, round2: true, firstBidder: state.highBidder };
+}
+
+// Minimum legal bid in round 2 for the player to act: at least 20, and above current high
+function round2MinBid(state) {
+  return Math.max(20, state.highBid + 1);
+}
+
+function placeBid2(state, seat, bid) {
+  if (state.phase !== 'bidding2') return { error: 'Not in round 2 bidding' };
+  if (seat !== state.currentBidder) return { error: 'Not your turn' };
+  const min = round2MinBid(state);
+  if (bid < min || bid > 28) return { error: `Round 2 bid must be ${min}–28` };
+
+  state.bids[seat] = bid;
+  state.highBid = bid;
+  state.highBidder = seat;
+  state.passCount = 0;
+  if (!state.round2Acted.includes(seat)) state.round2Acted.push(seat);
+  state.currentBidder = nextCounterClockwise(seat);
   return { ok: true };
 }
 
-function raiseBid(state, seat, newBid) {
-  // After 2nd deal, bidder or partner may raise (must bid ≥24)
-  if (state.phase !== 'bidding2') return { error: 'Not in raise phase' };
-  const bidderTeam = getTeam(state, state.highBidder);
-  const requesterTeam = getTeam(state, seat);
-  if (bidderTeam !== requesterTeam) return { error: 'Only bidding team can raise' };
-  if (newBid < 24) return { error: 'Raise must be at least 24' };
-  if (newBid <= state.highBid) return { error: 'Raise must exceed current bid' };
-  if (newBid > 28) return { error: 'Max bid is 28' };
-  state.highBid = newBid;
-  return startPlay(state);
+function passBid2(state, seat) {
+  if (state.phase !== 'bidding2') return { error: 'Not in round 2 bidding' };
+  if (seat !== state.currentBidder) return { error: 'Not your turn' };
+
+  if (!state.round2Acted.includes(seat)) state.round2Acted.push(seat);
+  state.passCount++;
+  state.currentBidder = nextCounterClockwise(seat);
+
+  // End once every player has had a turn AND the standing bid has gone
+  // unchallenged by the others (3 consecutive passes around the table).
+  const everyoneActed = state.round2Acted.length >= 4;
+  if (everyoneActed && state.passCount >= 3) {
+    return finalizeBidding2(state);
+  }
+  return { ok: true };
 }
 
-function skipRaise(state) {
+function finalizeBidding2(state) {
+  // The final high bidder holds the contract and chooses (or changes) trump.
+  state.phase = 'choosing_trump2';
+  return { ok: true, awaitingTrump2: true, bidder: state.highBidder };
+}
+
+// ── Round 2 trump choice (winner may keep or change the trump) ──
+
+function chooseTrump2(state, seat, card, thani = false) {
+  if (state.phase !== 'choosing_trump2') return { error: 'Not choosing trump phase' };
+  if (seat !== state.highBidder) return { error: 'Only the contract holder chooses trump' };
+
+  const handIdx = state.hands[seat].findIndex(c => c.suit === card.suit && c.rank === card.rank);
+  if (handIdx === -1) return { error: 'Card not in hand' };
+
+  // The contract holder now holds the hidden trump indicator (kept in hand).
+  state.trumpCard = state.hands[seat][handIdx];
+  state.trumpIndicatorSeat = seat;
+  state.trumpRevealed = false;
+  state.trumpSuit = null;
+
+  if (thani) {
+    state.isThani = true;
+    state.thaniDeclared = true;
+    state.currentLeader = state.highBidder; // bidder leads
+    state.phase = 'playing';
+    revealTrump(state); // trump revealed at start for Thani
+    return { ok: true, thani: true };
+  }
+
   return startPlay(state);
 }
 
 function declareThani(state, seat) {
-  if (state.phase !== 'bidding2') return { error: 'Thani must be declared after 2nd deal' };
-  if (seat !== state.highBidder) return { error: 'Only the bidder can declare Thani' };
+  // Optional: the round-2 contract holder declares a solo hand
+  if (state.phase !== 'choosing_trump2') return { error: 'Thani is declared at the round 2 trump step' };
+  if (seat !== state.highBidder) return { error: 'Only the contract holder can declare Thani' };
+  if (!state.trumpCard) return { error: 'Choose a trump first' };
   state.isThani = true;
   state.thaniDeclared = true;
-  // Bidder leads to first trick
-  state.currentLeader = state.highBidder;
+  state.currentLeader = state.highBidder; // bidder leads
   state.phase = 'playing';
-  revealTrump(state); // Trump is always revealed at start for Thani
+  revealTrump(state); // trump is revealed at the start for Thani
   return { ok: true, thani: true };
 }
 
@@ -494,6 +555,10 @@ function nextHand(state) {
   state.isCot = false;
   state.cotOffered = false;
   state.lastHandResult = null;
+  state.round2 = false;
+  state.round2Acted = [];
+  state.round1Bid = null;
+  state.round1Bidder = null;
   state.phase = 'bidding';
 
   const dealOrder = getCounterClockwiseOrder(state.dealer, 4);
@@ -547,6 +612,9 @@ function getPlayerView(state, viewerSeat) {
     highBid: state.highBid,
     highBidder: state.highBidder,
     bids: state.bids,
+    // Round 2 auction info for the client
+    round2: state.phase === 'bidding2',
+    round2MinBid: state.phase === 'bidding2' ? round2MinBid(state) : null,
     trumpRevealed: state.trumpRevealed,
     trumpSuit: state.trumpRevealed ? state.trumpSuit : null,
     // Only bidder knows the trump suit before reveal
@@ -577,8 +645,10 @@ module.exports = {
   placeBid,
   passBid,
   chooseTrump,
-  raiseBid,
-  skipRaise,
+  placeBid2,
+  passBid2,
+  chooseTrump2,
+  round2MinBid,
   declareThani,
   requestTrumpReveal,
   playCard,

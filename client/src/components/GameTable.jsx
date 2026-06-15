@@ -145,7 +145,7 @@ export function GameTable({ gameState, myInfo, players, chatMessages, actions, n
 
         {/* ── Centre trick area ── */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="relative" style={{ width: 160, height: 140 }}>
+          <div className="relative" style={{ width: 200, height: 180 }}>
             {/* North card */}
             {Object.entries(trickBySeat).map(([seat, card]) => {
               const s = Number(seat);
@@ -160,7 +160,7 @@ export function GameTable({ gameState, myInfo, players, chatMessages, actions, n
               return (
                 <div key={seat} className={positions[pos]}>
                   <div className={trickWinnerSeat === s ? 'ring-2 ring-gold rounded-lg' : ''}>
-                    <PlayingCard card={card} size="sm" />
+                    <PlayingCard card={card} size="md" />
                   </div>
                 </div>
               );
@@ -308,21 +308,25 @@ function ActionPanel({ gameState, mySeat, actions, players }) {
 
   if (phase === 'choosing_trump') {
     return <div className="panel p-3 text-center text-cardWhite/60 text-sm">
-      Waiting for bidder to choose trump…
+      Waiting for the round 1 winner to choose trump…
     </div>;
   }
 
+  // Round 2: a full second auction (minimum bid 20), starting with the round-1 winner
   if (phase === 'bidding2') {
-    const partnerSeat = (gameState.highBidder + 2) % 4;
-    return <RaiseBidPanel
-      highBid={gameState.highBid}
-      mySeat={mySeat}
-      bidderSeat={gameState.highBidder}
-      partnerSeat={partnerSeat}
-      onRaise={actions.raiseBid}
-      onSkip={actions.skipRaise}
-      onThani={actions.declareThani}
-    />;
+    return <BiddingPanel28 gameState={gameState} mySeat={mySeat} round2
+      onBid={actions.placeBid} onPass={actions.placeBid.bind(null, 'pass')} />;
+  }
+
+  // Round 2 trump choice — the final contract holder may keep or change trump
+  if (phase === 'choosing_trump2' && gameState.highBidder === mySeat) {
+    return <TrumpChooser hand={gameState.hand} onChoose={actions.chooseTrump} round2
+      currentTrump={gameState.trumpSuitForBidder} onThani={actions.declareThani} />;
+  }
+  if (phase === 'choosing_trump2') {
+    return <div className="panel p-3 text-center text-cardWhite/60 text-sm">
+      Waiting for the round 2 winner to set trump…
+    </div>;
   }
 
   if (phase === 'bidding' && gameType === '56') {
